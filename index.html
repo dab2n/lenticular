@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lenticular Card Workspace</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="logo">LENTICULAR</div>
+            <h1>Card Generator</h1>
+            <button id="addSetBtn" class="add-btn">+ 새 카드 추가</button>
+        </header>
+
+        <!-- 새로운 레이아웃: 사이드바 + 메인 캔버스 -->
+        <div class="editor-layout">
+            <!-- 좌측 썸네일 히스토리 패널 -->
+            <aside class="history-panel">
+                <div class="history-label">HISTORY</div>
+                <div class="history-list" id="historyList">
+                    <!-- 자바스크립트가 여기에 썸네일을 추가합니다 -->
+                </div>
+            </aside>
+
+            <!-- 중앙 활성 캔버스 영역 -->
+            <main class="active-workspace" id="activeWorkspace">
+                <!-- 자바스크립트가 여기에 현재 선택된 카드의 작업 공간을 보여줍니다 -->
+            </main>
+        </div>
+    </div>
+
+    <!-- 복제용 템플릿 (화면에는 보이지 않음) -->
+    <template id="cardSetTemplate">
+        <div class="workspace">
+            <div class="panel">
+                <div class="panel-label">이미지 업로드</div>
+                <label class="drop-zone dz1">
+                    <input type="file" class="file1" accept="image/*">
+                    <div class="dz-body">
+                        <span class="dz-name">Image 1</span>
+                        <span class="dz-hint">정면 이미지</span>
+                    </div>
+                    <img class="dz-thumb thumb1" src="" alt="">
+                </label>
+                <div class="panel-sep">+</div>
+                <label class="drop-zone dz2">
+                    <input type="file" class="file2" accept="image/*">
+                    <div class="dz-body">
+                        <span class="dz-name">Image 2</span>
+                        <span class="dz-hint">전환될 이미지</span>
+                    </div>
+                    <img class="dz-thumb thumb2" src="" alt="">
+                </label>
+            </div>
+
+            <div class="stage">
+                <div class="scene">
+                    <div class="card">
+                        <canvas class="canvas"></canvas>
+                        <div class="gloss"></div>
+                        <div class="idle">
+                            <div class="idle-bars">
+                                <b></b><b></b><b></b><b></b><b></b><b></b>
+                            </div>
+                            <p>이미지를<br>업로드해주세요</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="stage-hint">← 마우스를 올려 좌우로 기울여보세요 →</div>
+            </div>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>
