@@ -169,61 +169,79 @@ class LenticularCard {
       showToast("로딩 중입니다. 잠시 후 다시 시도해주세요.");
       return;
     }
+    if (!this.img1 && !this.img2) {
+      showToast("먼저 이미지를 업로드해주세요.");
+      return;
+    }
     showToast("렌티큘러 굽는 중... (약 5초 소요) ⏳\n화면을 유지해주세요!");
-    
-    // gif.js 세팅
+
     const gif = new GIF({ workers: 2, quality: 10, width: this.width, height: this.height, workerScript: gifWorkerBlobUrl });
-    
-    // 안 보이는 도화지(캔버스) 준비
+
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = this.width; tempCanvas.height = this.height;
     const tCtx = tempCanvas.getContext('2d');
 
-    const frames = 30; // 30장의 사진 캡처 (부드러운 루프)
+    const frames = 36; // 36프레임 → 한 번의 완전한 회전 사이클
     for (let i = 0; i < frames; i++) {
-        const time = (i / frames) * Math.PI * 2; 
-        const sineVal = Math.sin(time);
-        const progress = (sineVal + 1) / 2; // 투명도 교차 (0 ~ 1)
-        
-        tCtx.clearRect(0, 0, this.width, this.height);
-        
-        // 1. 이미지 그리기
-        if (this.img1 && progress < 1) { tCtx.globalAlpha = 1 - progress; this.drawCover(tCtx, this.img1, this.width, this.height); }
-        if (this.img2 && progress > 0) { tCtx.globalAlpha = progress; this.drawCover(tCtx, this.img2, this.width, this.height); }
-        tCtx.globalAlpha = 1.0;
+      const time     = (i / frames) * Math.PI * 2;
+      const sineVal  = Math.sin(time);              // -1 ~ +1
 
-        // 2. 홀로그램(Gloss) 얹기
-        const tiltX = sineVal * 18; const tiltY = Math.cos(time) * 5;
-        const gx = 50 + (tiltX / 18) * 30; const gy = 50 - (tiltY / 5) * 30;
-        const cx = this.width * (gx / 100); const cy = this.height * (gy / 100);
-        const radius = Math.max(this.width, this.height) * 0.65;
-        
-        const gradient = tCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-        gradient.addColorStop(0, 'rgba(255,255,255,0.15)');
-        gradient.addColorStop(0.38, 'rgba(255,255,255,0.05)');
-        gradient.addColorStop(1, 'rgba(255,255,255,0)');
-        
-        tCtx.globalCompositeOperation = 'screen';
-        tCtx.fillStyle = gradient;
-        tCtx.fillRect(0, 0, this.width, this.height);
-        tCtx.globalCompositeOperation = 'source-over'; // 리셋
+      // ── 이미지 교체 비율: 왼쪽 기울기=img1, 오른쪽 기울기=img2 ──
+      const progress = (sineVal + 1) / 2;           // 0 ~ 1
 
-        // 도화지를 한 장씩 GIF 압축기에 넣기 (프레임 딜레이 50ms)
-        gif.addFrame(tempCanvas, {delay: 50, copy: true});
+      // ── 3D 회전 시뮬레이션 ──────────────────────────────────────
+      // CSS rotateY(θ)의 원근감 = 가로 폭이 cos(θ)배로 좁아짐
+      const tiltDeg  = sineVal * 18;                // -18° ~ +18°
+      const tiltRad  = tiltDeg * Math.PI / 180;
+      const scaleX   = Math.max(0.02, Math.abs(Math.cos(tiltRad)));
+      const scaledW  = this.width * scaleX;
+      const offsetX  = (this.width - scaledW) / 2;  // 카드를 캔버스 중앙에 유지
+
+      // ① 어두운 배경 (카드가 기울면 양옆이 드러남)
+      tCtx.fillStyle = '#080808';
+      tCtx.fillRect(0, 0, this.width, this.height);
+
+      // ② 이미지: 가로로 압축된 공간에 그리기
+      tCtx.save();
+      tCtx.translate(offsetX, 0);
+      tCtx.scale(scaleX, 1);
+      if (this.img1 && progress < 1) { tCtx.globalAlpha = 1 - progress; this.drawCover(tCtx, this.img1, this.width, this.height); }
+      if (this.img2 && progress > 0) { tCtx.globalAlpha = progress;     this.drawCover(tCtx, this.img2, this.width, this.height); }
+      tCtx.globalAlpha = 1.0;
+      tCtx.restore();
+
+      // ③ 홀로그램 광택: 카드 영역(offsetX ~ offsetX+scaledW)에만 클리핑
+      tCtx.save();
+      tCtx.beginPath();
+      tCtx.rect(offsetX, 0, scaledW, this.height);
+      tCtx.clip();
+
+      const glossX   = offsetX + scaledW * (0.5 + sineVal * 0.30);
+      const glossY   = this.height * (0.5 - Math.cos(time) * 0.25);
+      const glossR   = scaledW * 0.75;
+      const gradient = tCtx.createRadialGradient(glossX, glossY, 0, glossX, glossY, glossR);
+      gradient.addColorStop(0,    'rgba(255,255,255,0.14)');
+      gradient.addColorStop(0.40, 'rgba(255,255,255,0.04)');
+      gradient.addColorStop(1,    'rgba(255,255,255,0)');
+      tCtx.globalCompositeOperation = 'screen';
+      tCtx.fillStyle = gradient;
+      tCtx.fillRect(offsetX, 0, scaledW, this.height);
+      tCtx.globalCompositeOperation = 'source-over';
+      tCtx.restore();
+
+      gif.addFrame(tempCanvas, { delay: 50, copy: true });
     }
 
     gif.on('finished', (blob) => {
-        showToast("완성! 파일이 다운로드됩니다 🎉");
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'my_lenticular_card.gif';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+      showToast("완성! 파일이 다운로드됩니다 🎉");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'my_lenticular_card.gif';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
     });
 
-    gif.render(); // 굽기 시작
+    gif.render();
   }
 
   initEvents() {
