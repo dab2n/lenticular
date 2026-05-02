@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lenticular Card Workspace</title>
     <link rel="stylesheet" href="style.css">
+    <!-- 💡 외부 라이브러리 (GIF 생성용) 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
 </head>
 <body>
     <div class="app">
@@ -64,11 +66,14 @@
                         </div>
                     </div>
                 </div>
-                <!-- 💡 메인 스테이지 하단으로 센서 버튼 이동 -->
+                <!-- 💡 버튼들을 그룹화하고 저장 버튼 추가 -->
                 <div class="stage-footer">
                     <div class="stage-hint">← 기기를 기울여보세요 →</div>
-                    <button class="workspace-motion-btn" style="display: none;">🧭 센서 켜기</button>
-                    <button class="share-trigger-btn">🔗 공유하기</button>
+                    <div class="stage-actions">
+                        <button class="workspace-motion-btn" style="display: none;">🧭 센서</button>
+                        <button class="save-gif-btn">💾 GIF 저장</button>
+                        <button class="share-trigger-btn">🔗 공유</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -98,7 +103,7 @@
         </div>
     </div>
 
-    <!-- 💡 공유 모달: 모션 버튼 완전히 삭제됨 -->
+    <!-- 공유 모달 -->
     <div class="share-modal" id="shareModal">
         <div class="share-container">
             <div class="share-header">

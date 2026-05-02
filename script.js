@@ -3,7 +3,15 @@ const MAX_X  = 22;
 const MAX_Y  = 14;
 const LERP   = 0.07;
 
-// 💡 메인 캔버스용 글로벌 모션 상태
+// 💡 GIF 렌더링용 Worker 파일 우회 로딩 (CORS 보안 에러 방지)
+let gifWorkerBlobUrl = null;
+fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js')
+  .then(res => res.text())
+  .then(text => {
+    const blob = new Blob([text], { type: 'application/javascript' });
+    gifWorkerBlobUrl = URL.createObjectURL(blob);
+  }).catch(e => console.error("GIF Worker 로드 실패", e));
+
 let isGlobalMotionEnabled = false;
 let globalTargetX = 0; let globalTargetY = 0;
 
@@ -29,7 +37,7 @@ function enableGlobalMotion(btn) {
   });
 }
 
-/* ── Drawing Editor Logic (기존과 동일) ── */
+/* ── Drawing Editor Logic ── */
 const drawingModal = document.getElementById('drawingModal');
 const drawingBoard = document.getElementById('drawingBoard');
 const drawCanvas = document.getElementById('drawCanvas');
@@ -68,21 +76,18 @@ function applyPenStyle() {
   else if (penType.value === 'neon') { drawCtx.globalAlpha = 1.0; drawCtx.shadowBlur = 15; drawCtx.shadowColor = penColor.value; } 
   else { drawCtx.globalAlpha = 1.0; drawCtx.shadowBlur = 0; }
 }
-
 function getPointerPos(e) {
     const rect = drawCanvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     return { x: clientX - rect.left, y: clientY - rect.top };
 }
-
 drawCanvas.addEventListener('mousedown', (e) => { isDrawing = true; applyPenStyle(); drawCtx.beginPath(); const pos = getPointerPos(e); drawCtx.moveTo(pos.x, pos.y); });
 drawCanvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const pos = getPointerPos(e); drawCtx.lineTo(pos.x, pos.y); drawCtx.stroke(); });
 window.addEventListener('mouseup', () => { isDrawing = false; });
 drawCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); isDrawing = true; applyPenStyle(); drawCtx.beginPath(); const pos = getPointerPos(e); drawCtx.moveTo(pos.x, pos.y); }, {passive: false});
 drawCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const pos = getPointerPos(e); drawCtx.lineTo(pos.x, pos.y); drawCtx.stroke(); }, {passive: false});
 window.addEventListener('touchend', () => { isDrawing = false; });
-
 clearBtn.addEventListener('click', () => { if (currentBgImage) drawCtx.putImageData(currentBgImage, 0, 0); });
 cancelBtn.addEventListener('click', closeDrawingEditor);
 saveBtn.addEventListener('click', () => {
@@ -99,8 +104,11 @@ class LenticularCard {
     this.card   = this.workspace.querySelector('.card'); this.canvas = this.workspace.querySelector('.canvas');
     this.gloss  = this.workspace.querySelector('.gloss'); this.idle   = this.workspace.querySelector('.idle');
     this.hint   = this.workspace.querySelector('.stage-hint'); 
+    
     this.shareBtn = this.workspace.querySelector('.share-trigger-btn');
-    this.motionBtn = this.workspace.querySelector('.workspace-motion-btn'); // 모션 버튼 바인딩
+    this.saveGifBtn = this.workspace.querySelector('.save-gif-btn'); // 💡 저장 버튼 바인딩
+    this.motionBtn = this.workspace.querySelector('.workspace-motion-btn'); 
+    
     this.dz1    = this.workspace.querySelector('.dz1'); this.dz2    = this.workspace.querySelector('.dz2');
     this.file1  = this.workspace.querySelector('.file1'); this.file2  = this.workspace.querySelector('.file2');
     this.thumb1 = this.workspace.querySelector('.thumb1'); this.thumb2 = this.workspace.querySelector('.thumb2');
@@ -131,26 +139,21 @@ class LenticularCard {
     this.updateCanvasSize();
     if (this.onImageUpdate && (this.img1 || this.img2)) this.onImageUpdate(this.thumb1.src, this.isLandscape);
   }
-  drawCover(img) {
-    const scale = Math.max(this.width / img.naturalWidth, this.height / img.naturalHeight);
+  drawCover(ctx, img, w_area, h_area) {
+    const scale = Math.max(w_area / img.naturalWidth, h_area / img.naturalHeight);
     const w = img.naturalWidth * scale; const h = img.naturalHeight * scale;
-    this.ctx.drawImage(img, (this.width - w) / 2, (this.height - h) / 2, w, h);
+    ctx.drawImage(img, (w_area - w) / 2, (h_area - h) / 2, w, h);
   }
   render(progress) {
     this.ctx.clearRect(0, 0, this.width, this.height);
     if (!this.img1 && !this.img2) return;
     const p = Math.max(0, Math.min(1, progress));
-    if (this.img1 && p < 1) { this.ctx.globalAlpha = 1 - p; this.drawCover(this.img1); }
-    if (this.img2 && p > 0) { this.ctx.globalAlpha = p; this.drawCover(this.img2); }
+    if (this.img1 && p < 1) { this.ctx.globalAlpha = 1 - p; this.drawCover(this.ctx, this.img1, this.width, this.height); }
+    if (this.img2 && p > 0) { this.ctx.globalAlpha = p; this.drawCover(this.ctx, this.img2, this.width, this.height); }
     this.ctx.globalAlpha = 1.0;
   }
   tick() {
-    // 💡 모바일 자이로스코프가 켜져있다면, 목표 좌표를 글로벌 센서 값으로 대체
-    if (isGlobalMotionEnabled) {
-      this.tgtX = globalTargetX;
-      this.tgtY = globalTargetY;
-    }
-
+    if (isGlobalMotionEnabled) { this.tgtX = globalTargetX; this.tgtY = globalTargetY; }
     this.curX += (this.tgtX - this.curX) * LERP; this.curY += (this.tgtY - this.curY) * LERP;
     const scale = this.hovering && !isGlobalMotionEnabled ? 1.045 : 1;
     this.card.style.transform = `rotateX(${this.curY}deg) rotateY(${this.curX}deg) scale(${scale})`;
@@ -159,11 +162,75 @@ class LenticularCard {
     this.render((this.curX + MAX_X) / (MAX_X * 2));
     requestAnimationFrame(this.tick);
   }
+
+  // 💡 GIF 다운로드 생성 핵심 로직
+  async generateAndDownloadGIF() {
+    if (!gifWorkerBlobUrl) {
+      showToast("로딩 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+    showToast("렌티큘러 굽는 중... (약 5초 소요) ⏳\n화면을 유지해주세요!");
+    
+    // gif.js 세팅
+    const gif = new GIF({ workers: 2, quality: 10, width: this.width, height: this.height, workerScript: gifWorkerBlobUrl });
+    
+    // 안 보이는 도화지(캔버스) 준비
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = this.width; tempCanvas.height = this.height;
+    const tCtx = tempCanvas.getContext('2d');
+
+    const frames = 30; // 30장의 사진 캡처 (부드러운 루프)
+    for (let i = 0; i < frames; i++) {
+        const time = (i / frames) * Math.PI * 2; 
+        const sineVal = Math.sin(time);
+        const progress = (sineVal + 1) / 2; // 투명도 교차 (0 ~ 1)
+        
+        tCtx.clearRect(0, 0, this.width, this.height);
+        
+        // 1. 이미지 그리기
+        if (this.img1 && progress < 1) { tCtx.globalAlpha = 1 - progress; this.drawCover(tCtx, this.img1, this.width, this.height); }
+        if (this.img2 && progress > 0) { tCtx.globalAlpha = progress; this.drawCover(tCtx, this.img2, this.width, this.height); }
+        tCtx.globalAlpha = 1.0;
+
+        // 2. 홀로그램(Gloss) 얹기
+        const tiltX = sineVal * 18; const tiltY = Math.cos(time) * 5;
+        const gx = 50 + (tiltX / 18) * 30; const gy = 50 - (tiltY / 5) * 30;
+        const cx = this.width * (gx / 100); const cy = this.height * (gy / 100);
+        const radius = Math.max(this.width, this.height) * 0.65;
+        
+        const gradient = tCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        gradient.addColorStop(0, 'rgba(255,255,255,0.15)');
+        gradient.addColorStop(0.38, 'rgba(255,255,255,0.05)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        
+        tCtx.globalCompositeOperation = 'screen';
+        tCtx.fillStyle = gradient;
+        tCtx.fillRect(0, 0, this.width, this.height);
+        tCtx.globalCompositeOperation = 'source-over'; // 리셋
+
+        // 도화지를 한 장씩 GIF 압축기에 넣기 (프레임 딜레이 50ms)
+        gif.addFrame(tempCanvas, {delay: 50, copy: true});
+    }
+
+    gif.on('finished', (blob) => {
+        showToast("완성! 파일이 다운로드됩니다 🎉");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'my_lenticular_card.gif';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    gif.render(); // 굽기 시작
+  }
+
   initEvents() {
     this.card.addEventListener('mouseenter', () => { this.hovering = true; });
     this.card.addEventListener('mouseleave', () => { this.hovering = false; if(!isGlobalMotionEnabled){ this.tgtX = 0; this.tgtY = 0; }});
     this.card.addEventListener('mousemove', (e) => {
-      if(isGlobalMotionEnabled) return; // 센서 켜져있으면 마우스 무시
+      if(isGlobalMotionEnabled) return; 
       const r = this.card.getBoundingClientRect();
       this.tgtX = ((e.clientX - r.left - r.width / 2) / (r.width / 2)) * MAX_X;
       this.tgtY = ((e.clientY - r.top - r.height / 2) / (r.height / 2)) * -MAX_Y;
@@ -179,7 +246,11 @@ class LenticularCard {
     this.editBtn1.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (this.img1) openDrawingEditor(this.img1, this.isLandscape, (url) => this.loadFromUrl(url, 1)); });
     this.editBtn2.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (this.img2) openDrawingEditor(this.img2, this.isLandscape, (url) => this.loadFromUrl(url, 2)); });
     this.ratioBtns.forEach(btn => btn.addEventListener('click', () => this.setRatio(btn.dataset.ratio)));
+    
+    // 버튼 기능 연동
     this.shareBtn.addEventListener('click', () => { openShareModal(this.img1, this.img2, this.isLandscape); });
+    this.saveGifBtn.addEventListener('click', () => { this.generateAndDownloadGIF(); });
+
     window.addEventListener('resize', () => this.updateCanvasSize()); 
   }
   onImageReady() { if (this.img1 || this.img2) { this.idle.classList.add('gone'); this.hint.classList.add('show'); } }
@@ -257,7 +328,6 @@ function renderShareCanvas(progress) {
   shareCtx.globalAlpha = 1.0;
 }
 
-// 💡 모달에서는 이제 오직 자동 애니메이션만 부드럽게 실행됩니다
 function playShareAnimation() {
   if (!isSharePlaying) return;
   
@@ -277,7 +347,7 @@ function playShareAnimation() {
 
 function showToast(msg) {
   toast.innerText = msg; toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2000);
+  setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
 closeShareBtn.addEventListener('click', closeShareModal);
