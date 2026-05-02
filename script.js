@@ -190,14 +190,17 @@ class LenticularCard {
 
     const FRAMES      = 36;   // 프레임 수 (1 사이클)
     const STRIPS      = 80;   // 수직 스트립 수 (많을수록 부드러운 원근감)
-    const PERSPECTIVE = 900;  // 원근 거리 px — 낮을수록 왜곡 강함 (CSS perspective 값과 동일 개념)
-    const MAX_TILT    = 52;   // 최대 회전각 (°) — 크게 잡아야 3D 회전이 명확하게 보임
+    const PERSPECTIVE = 900;  // 원근 거리 px — 낮을수록 왜곡 강함
+    const MAX_TILT    = 28;   // 최대 회전각 (°) — 자연스러운 기울기
+    const RADIUS      = 18;   // 카드 모서리 둥글기 (CSS border-radius와 동일)
+
+    const cx = W / 2; // 화면 수평 중심
 
     for (let i = 0; i < FRAMES; i++) {
       const time    = (i / FRAMES) * Math.PI * 2;
       const sineVal = Math.sin(time);            // -1 ~ +1
       const p       = (sineVal + 1) / 2;         // 이미지 교체 비율 (0=img1, 1=img2)
-      const tiltDeg = sineVal * MAX_TILT;         // 실제 회전각
+      const tiltDeg = sineVal * MAX_TILT;
       const tiltRad = tiltDeg * Math.PI / 180;
 
       // ── ① 블렌딩된 이미지를 중간 캔버스에 렌더 ──────────────────
@@ -206,30 +209,49 @@ class LenticularCard {
       if (this.img2 && p > 0) { cCtx.globalAlpha = p;     this.drawCover(cCtx, this.img2, W, H); }
       cCtx.globalAlpha = 1.0;
 
-      // ── ② 수직 스트립 원근 투영 (CSS rotateY의 수학적 재현) ─────
-      //  각 스트립의 3D x좌표 → Y축 회전 → 원근 투영 → 화면 x좌표
-      //  결과: 가까운 면은 크게, 먼 면은 작게 → 진짜 3D 회전처럼 보임
+      // ── ② 카드 화면 경계 사전 계산 (클립·광택 공유) ──────────────
+      const edgeLeft  = cx + (-W/2) * Math.cos(tiltRad) * (PERSPECTIVE / (PERSPECTIVE - (-W/2) * Math.sin(tiltRad)));
+      const edgeRight = cx + ( W/2) * Math.cos(tiltRad) * (PERSPECTIVE / (PERSPECTIVE - ( W/2) * Math.sin(tiltRad)));
+      const cardLeft  = Math.min(edgeLeft, edgeRight);
+      const cardRight = Math.max(edgeLeft, edgeRight);
+      const cardW     = cardRight - cardLeft;
+      // 투영된 너비에 비례해 모서리 반지름 축소 (심하게 기울면 반지름도 줄어듦)
+      const r = Math.min(RADIUS * (cardW / W), cardW / 2, H / 2);
+
+      // ── ③ 라운드 클립 경로 설정 → 배경·스트립·광택 모두 적용 ──
+      tCtx.clearRect(0, 0, W, H);
+      tCtx.save();
+      // 둥근 모서리 경로 (roundRect 미지원 브라우저 대비 직접 구현)
+      tCtx.beginPath();
+      tCtx.moveTo(cardLeft + r, 0);
+      tCtx.lineTo(cardLeft + cardW - r, 0);
+      tCtx.quadraticCurveTo(cardLeft + cardW, 0, cardLeft + cardW, r);
+      tCtx.lineTo(cardLeft + cardW, H - r);
+      tCtx.quadraticCurveTo(cardLeft + cardW, H, cardLeft + cardW - r, H);
+      tCtx.lineTo(cardLeft + r, H);
+      tCtx.quadraticCurveTo(cardLeft, H, cardLeft, H - r);
+      tCtx.lineTo(cardLeft, r);
+      tCtx.quadraticCurveTo(cardLeft, 0, cardLeft + r, 0);
+      tCtx.closePath();
+      tCtx.clip();
+
+      // 어두운 배경 (클립 안에서만 채움)
       tCtx.fillStyle = '#080808';
-      tCtx.fillRect(0, 0, W, H);
+      tCtx.fillRect(cardLeft, 0, cardW, H);
 
-      const cx = W / 2; // 화면 수평 중심
-
+      // ── ④ 수직 스트립 원근 투영 ───────────────────────────────────
       for (let s = 0; s < STRIPS; s++) {
-        const u0 = s / STRIPS;           // 스트립 왼쪽 경계 (0~1)
-        const u1 = (s + 1) / STRIPS;     // 스트립 오른쪽 경계
+        const u0 = s / STRIPS;
+        const u1 = (s + 1) / STRIPS;
 
-        // 카드 중심 기준 3D x 좌표
         const x3d0 = (u0 - 0.5) * W;
         const x3d1 = (u1 - 0.5) * W;
 
-        // Y축 회전 후: xRot(화면 좌우), z(깊이 — 양수=뷰어에 가까움)
         const xRot0 = x3d0 * Math.cos(tiltRad),  z0 = x3d0 * Math.sin(tiltRad);
         const xRot1 = x3d1 * Math.cos(tiltRad),  z1 = x3d1 * Math.sin(tiltRad);
 
-        // 뷰어 뒤로 넘어간 면은 건너뜀
         if (PERSPECTIVE - z0 <= 0 || PERSPECTIVE - z1 <= 0) continue;
 
-        // 원근 투영: x' = cx + xRot × (P / (P − z))
         const xs0 = cx + xRot0 * (PERSPECTIVE / (PERSPECTIVE - z0));
         const xs1 = cx + xRot1 * (PERSPECTIVE / (PERSPECTIVE - z1));
 
@@ -237,33 +259,22 @@ class LenticularCard {
         const destW = Math.abs(xs1 - xs0);
         if (destW < 0.5) continue;
 
-        // 중간 캔버스에서 해당 스트립 잘라 붙이기
         tCtx.drawImage(compCanvas, u0 * W, 0, W / STRIPS, H, destX, 0, destW, H);
       }
 
-      // ── ③ 홀로그램 광택 (카드 영역에 클리핑) ────────────────────
-      // 회전 후 카드의 화면상 좌우 경계 계산
-      const edgeLeft  = cx + (-W / 2) * Math.cos(tiltRad) * (PERSPECTIVE / (PERSPECTIVE - (-W / 2) * Math.sin(tiltRad)));
-      const edgeRight = cx + ( W / 2) * Math.cos(tiltRad) * (PERSPECTIVE / (PERSPECTIVE - ( W / 2) * Math.sin(tiltRad)));
-      const cardLeft  = Math.min(edgeLeft, edgeRight);
-      const cardRight = Math.max(edgeLeft, edgeRight);
-
-      tCtx.save();
-      tCtx.beginPath();
-      tCtx.rect(cardLeft, 0, cardRight - cardLeft, H);
-      tCtx.clip();
-
-      const glossX = cardLeft + (cardRight - cardLeft) * (0.5 + sineVal * 0.30);
+      // ── ⑤ 홀로그램 광택 (라운드 클립 안에서 자동 처리) ─────────
+      const glossX = cardLeft + cardW * (0.5 + sineVal * 0.30);
       const glossY = H * (0.5 - Math.cos(time) * 0.25);
-      const grad   = tCtx.createRadialGradient(glossX, glossY, 0, glossX, glossY, (cardRight - cardLeft) * 0.75);
+      const grad   = tCtx.createRadialGradient(glossX, glossY, 0, glossX, glossY, cardW * 0.75);
       grad.addColorStop(0,    'rgba(255,255,255,0.14)');
       grad.addColorStop(0.40, 'rgba(255,255,255,0.04)');
       grad.addColorStop(1,    'rgba(255,255,255,0)');
       tCtx.globalCompositeOperation = 'screen';
       tCtx.fillStyle = grad;
-      tCtx.fillRect(cardLeft, 0, cardRight - cardLeft, H);
+      tCtx.fillRect(cardLeft, 0, cardW, H);
       tCtx.globalCompositeOperation = 'source-over';
-      tCtx.restore();
+
+      tCtx.restore(); // 라운드 클립 해제
 
       gif.addFrame(tempCanvas, { delay: 50, copy: true });
     }
