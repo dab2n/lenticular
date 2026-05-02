@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lenticular Card — 공유된 카드</title>
+
+  <!-- OG / SNS 미리보기 -->
+  <meta property="og:title" content="렌티큘러 카드가 도착했어요!" />
+  <meta property="og:description" content="카드를 기울여 두 개의 이미지를 확인해보세요." />
+  <meta property="og:type" content="website" />
+
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.css"
+    crossorigin
+  />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050505; --surface: #101010; --border: #1e1e1e;
+      --muted: #303030; --dim: #484848; --text: #c0c0c0;
+    }
+    body {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── 카드 씬 ── */
+    .scene { perspective: 1200px; margin-bottom: 1.6rem; }
+    .preview-card {
+      width: 240px; height: 320px;
+      border-radius: 18px; position: relative; overflow: hidden;
+      box-shadow: 0 0 0 1px #1c1c1c, 0 20px 60px rgba(0,0,0,0.75), 0 50px 100px rgba(0,0,0,0.4);
+      will-change: transform; background: var(--surface);
+      transform-style: preserve-3d;
+    }
+    .preview-card.landscape { width: 320px; height: 240px; }
+    #viewCanvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      display: block; border-radius: 18px; z-index: 0;
+    }
+    .view-gloss {
+      position: absolute; inset: 0; border-radius: 18px;
+      z-index: 3; pointer-events: none; mix-blend-mode: screen;
+      background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.09) 0%, transparent 65%);
+    }
+
+    /* ── 메시지 ── */
+    .message-box {
+      max-width: 280px; text-align: center;
+      font-size: 0.85rem; color: var(--text); line-height: 1.7;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.9rem 1.2rem;
+      margin-bottom: 1.4rem; display: none;
+    }
+    .message-box.visible { display: block; }
+
+    /* ── 로딩/에러 상태 ── */
+    .status {
+      font-size: 0.78rem; color: var(--dim);
+      text-align: center; line-height: 1.8;
+      position: absolute; inset: 0; display: flex;
+      align-items: center; justify-content: center;
+    }
+
+    /* ── CTA 버튼 ── */
+    .cta {
+      display: inline-block; margin-top: 0.5rem;
+      background: #fff; color: #000;
+      padding: 10px 24px; border-radius: 8px;
+      font-size: 0.82rem; font-weight: 700;
+      text-decoration: none; transition: opacity 0.2s;
+    }
+    .cta:hover { opacity: 0.82; }
+
+    /* ── 힌트 텍스트 ── */
+    .hint {
+      font-size: 0.62rem; letter-spacing: 0.05em;
+      color: var(--muted); margin-bottom: 1.4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="scene">
+    <div class="preview-card" id="previewCard">
+      <canvas id="viewCanvas"></canvas>
+      <div class="view-gloss" id="viewGloss"></div>
+      <div class="status" id="status">불러오는 중…</div>
+    </div>
+  </div>
+
+  <p class="hint" id="hint" style="display:none">← 카드를 기울여 두 이미지를 확인해보세요 →</p>
+
+  <div class="message-box" id="messageBox"></div>
+
+  <a href="/" class="cta">나도 만들어보기 ✦</a>
+
+  <script>
+    /* ── 설정 ── */
+    // share.html이 배포된 뒤 WORKER_URL을 실제 Worker 주소로 교체하세요.
+    // 예) const WORKER_URL = 'https://lenticular-share.yourname.workers.dev';
+    const WORKER_URL = '';
+
+    /* ── DOM 참조 ── */
+    const previewCard = document.getElementById('previewCard');
+    const viewCanvas  = document.getElementById('viewCanvas');
+    const viewGloss   = document.getElementById('viewGloss');
+    const statusEl    = document.getElementById('status');
+    const hintEl      = document.getElementById('hint');
+    const messageBox  = document.getElementById('messageBox');
+    const viewCtx     = viewCanvas.getContext('2d');
+
+    let viewImg1 = null, viewImg2 = null;
+    let viewW = 240, viewH = 320;
+    let animId = null;
+
+    /* ── UUID 파싱 ── */
+    // URL 형태: /share/{uuid}  또는  share.html?uuid={uuid} (로컬 테스트용)
+    function getUuid() {
+      const pathMatch = location.pathname.match(/\/share\/([^/?#]+)/);
+      if (pathMatch) return pathMatch[1];
+      return new URLSearchParams(location.search).get('uuid');
+    }
+
+    /* ── Canvas 초기화 ── */
+    function initCanvas(isLandscape) {
+      viewW = isLandscape ? 320 : 240;
+      viewH = isLandscape ? 240 : 320;
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      viewCanvas.width  = viewW * dpr;
+      viewCanvas.height = viewH * dpr;
+      viewCtx.scale(dpr, dpr);
+      if (isLandscape) previewCard.classList.add('landscape');
+    }
+
+    /* ── 이미지 cover 그리기 ── */
+    function drawCover(img) {
+      const s = Math.max(viewW / img.naturalWidth, viewH / img.naturalHeight);
+      const w = img.naturalWidth * s; const h = img.naturalHeight * s;
+      viewCtx.drawImage(img, (viewW - w) / 2, (viewH - h) / 2, w, h);
+    }
+
+    function renderFrame(progress) {
+      viewCtx.clearRect(0, 0, viewW, viewH);
+      const p = Math.max(0, Math.min(1, progress));
+      if (viewImg1 && p < 1) { viewCtx.globalAlpha = 1 - p; drawCover(viewImg1); }
+      if (viewImg2 && p > 0) { viewCtx.globalAlpha = p;     drawCover(viewImg2); }
+      viewCtx.globalAlpha = 1.0;
+    }
+
+    /* ── 자동 진자 애니메이션 ── */
+    function startAnimation() {
+      function loop() {
+        const t = Date.now() / 800;
+        const sine = Math.sin(t);
+        const tiltX = sine * 20;
+        const tiltY = Math.cos(t * 0.5) * 6;
+
+        previewCard.style.transform = `rotateX(${tiltY}deg) rotateY(${tiltX}deg)`;
+
+        const gx = 50 + (tiltX / 20) * 28;
+        const gy = 50 - (tiltY / 6) * 28;
+        viewGloss.style.background =
+          `radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,0.18) 0%, transparent 65%)`;
+
+        renderFrame((sine + 1) / 2);
+        animId = requestAnimationFrame(loop);
+      }
+      if (animId) cancelAnimationFrame(animId);
+      loop();
+    }
+
+    /* ── 이미지 로드 헬퍼 ── */
+    function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`Failed to load: ${url}`));
+        img.src = url;
+      });
+    }
+
+    /* ── 메인 초기화 ── */
+    async function init() {
+      const uuid = getUuid();
+      if (!uuid) {
+        statusEl.textContent = '유효하지 않은 링크입니다.';
+        return;
+      }
+      if (!WORKER_URL) {
+        statusEl.textContent = 'WORKER_URL이 설정되지 않았습니다.\nshare.html을 배포한 뒤 WORKER_URL을 입력하세요.';
+        return;
+      }
+
+      try {
+        const res = await fetch(`${WORKER_URL}/api/share/${uuid}`);
+        if (!res.ok) throw new Error(`메타데이터 조회 실패 (${res.status})`);
+        const { img1Url, img2Url, message, isLandscape } = await res.json();
+
+        initCanvas(isLandscape);
+
+        // 이미지 로드 (img2는 없을 수 있음)
+        const workerBase = WORKER_URL;
+        viewImg1 = await loadImage(workerBase + img1Url);
+        if (img2Url) {
+          try { viewImg2 = await loadImage(workerBase + img2Url); } catch {}
+        }
+
+        // 로딩 상태 숨기기
+        statusEl.style.display = 'none';
+        hintEl.style.display = 'block';
+
+        // 메시지 표시
+        if (message && message.trim()) {
+          messageBox.textContent = message.trim();
+          messageBox.classList.add('visible');
+        }
+
+        startAnimation();
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = '카드를 불러오지 못했습니다.\n링크가 만료됐거나 유효하지 않습니다.';
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

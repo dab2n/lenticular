@@ -1,0 +1,3 @@
+# Cloudflare Pages SPA 라우팅
+# /share/{uuid} 로 접근하면 share.html을 서빙합니다.
+/share/*  /share.html  200

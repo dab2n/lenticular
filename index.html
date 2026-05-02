@@ -14,27 +14,22 @@
             <button id="addSetBtn" class="add-btn">+ 새 카드 추가</button>
         </header>
 
-        <!-- 새로운 레이아웃: 사이드바 + 메인 캔버스 -->
         <div class="editor-layout">
-            <!-- 좌측 썸네일 히스토리 패널 -->
             <aside class="history-panel">
                 <div class="history-label">HISTORY</div>
-                <div class="history-list" id="historyList">
-                    <!-- 자바스크립트가 여기에 썸네일을 추가합니다 -->
-                </div>
+                <div class="history-list" id="historyList"></div>
             </aside>
-
-            <!-- 중앙 활성 캔버스 영역 -->
-            <main class="active-workspace" id="activeWorkspace">
-                <!-- 자바스크립트가 여기에 현재 선택된 카드의 작업 공간을 보여줍니다 -->
-            </main>
+            <main class="active-workspace" id="activeWorkspace"></main>
         </div>
     </div>
 
-    <!-- 복제용 템플릿 (화면에는 보이지 않음) -->
     <template id="cardSetTemplate">
         <div class="workspace">
             <div class="panel">
+                <div class="ratio-toggle">
+                    <button class="ratio-btn active" data-ratio="portrait">▤ 3:4 세로</button>
+                    <button class="ratio-btn" data-ratio="landscape">▥ 4:3 가로</button>
+                </div>
                 <div class="panel-label">이미지 업로드</div>
                 <label class="drop-zone dz1">
                     <input type="file" class="file1" accept="image/*">
@@ -43,6 +38,7 @@
                         <span class="dz-hint">정면 이미지</span>
                     </div>
                     <img class="dz-thumb thumb1" src="" alt="">
+                    <button class="edit-btn edit-btn1">✏️ 그리기</button>
                 </label>
                 <div class="panel-sep">+</div>
                 <label class="drop-zone dz2">
@@ -52,6 +48,7 @@
                         <span class="dz-hint">전환될 이미지</span>
                     </div>
                     <img class="dz-thumb thumb2" src="" alt="">
+                    <button class="edit-btn edit-btn2">✏️ 그리기</button>
                 </label>
             </div>
 
@@ -61,18 +58,74 @@
                         <canvas class="canvas"></canvas>
                         <div class="gloss"></div>
                         <div class="idle">
-                            <div class="idle-bars">
-                                <b></b><b></b><b></b><b></b><b></b><b></b>
-                            </div>
+                            <div class="idle-bars"><b></b><b></b><b></b><b></b><b></b><b></b></div>
                             <p>이미지를<br>업로드해주세요</p>
                         </div>
                     </div>
                 </div>
-                <div class="stage-hint">← 마우스를 올려 좌우로 기울여보세요 →</div>
+                <div class="stage-footer">
+                    <div class="stage-hint">← 마우스를 올려 좌우로 기울여보세요 →</div>
+                    <div class="stage-actions">
+                        <button class="save-trigger-btn">⬇ 저장</button>
+                        <button class="share-trigger-btn">🔗 공유하기</button>
+                    </div>
+                </div>
             </div>
         </div>
     </template>
 
+    <!-- 드로잉 모달 -->
+    <div class="drawing-modal" id="drawingModal">
+        <div class="drawing-container">
+            <div class="drawing-header">
+                <div class="drawing-tools">
+                    <input type="color" id="penColor" class="tool-color" value="#ffffff">
+                    <select id="penType" class="tool-select">
+                        <option value="solid">기본 펜</option>
+                        <option value="marker">형광펜</option>
+                        <option value="neon">네온 펜</option>
+                    </select>
+                    <input type="range" id="penSize" class="tool-slider" min="1" max="30" value="5">
+                    <button id="clearCanvasBtn" class="tool-btn">초기화</button>
+                </div>
+                <div class="drawing-actions">
+                    <button id="cancelDrawBtn" class="tool-btn">취소</button>
+                    <button id="saveDrawBtn" class="add-btn">저장</button>
+                </div>
+            </div>
+            <div class="drawing-board" id="drawingBoard">
+                <canvas id="drawCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💡 업그레이드된 애니메이션 공유 모달 -->
+    <div class="share-modal" id="shareModal">
+        <div class="share-container">
+            <div class="share-header">
+                <h3>렌티큘러 카드 완성!</h3>
+                <button class="close-share-btn" id="closeShareBtn">✕</button>
+            </div>
+            <div class="share-body">
+                <!-- 렌티큘러 애니메이션 프리뷰 영역 -->
+                <div class="share-preview-wrapper">
+                    <div class="share-preview-card" id="sharePreviewCard">
+                        <canvas id="shareCanvas"></canvas>
+                        <div class="share-gloss" id="shareGloss"></div>
+                    </div>
+                </div>
+                <textarea class="share-msg-input" placeholder="친구에게 전할 메시지를 남겨보세요."></textarea>
+            </div>
+            <div class="share-actions">
+                <button class="share-copy-btn" id="copyLinkBtn">🔗 링크 복사</button>
+                <button class="share-send-btn" id="sendShareBtn">전송하기</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">복사되었습니다.</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

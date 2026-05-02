@@ -1,0 +1,9 @@
+name = "lenticular-share"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+
+# ── R2 버킷 바인딩 ──────────────────────────────────────────────
+# B-2 단계에서 Cloudflare 대시보드에서 만든 버킷 이름을 bucket_name에 입력하세요.
+[[r2_buckets]]
+binding = "LENTICULAR_BUCKET"
+bucket_name = "lenticular-cards"
