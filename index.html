@@ -65,16 +65,12 @@
                 </div>
                 <div class="stage-footer">
                     <div class="stage-hint">← 마우스를 올려 좌우로 기울여보세요 →</div>
-                    <div class="stage-actions">
-                        <button class="save-trigger-btn">⬇ 저장</button>
-                        <button class="share-trigger-btn">🔗 공유하기</button>
-                    </div>
+                    <button class="share-trigger-btn">🔗 공유하기</button>
                 </div>
             </div>
         </div>
     </template>
 
-    <!-- 드로잉 모달 -->
     <div class="drawing-modal" id="drawingModal">
         <div class="drawing-container">
             <div class="drawing-header">
@@ -99,7 +95,6 @@
         </div>
     </div>
 
-    <!-- 💡 업그레이드된 애니메이션 공유 모달 -->
     <div class="share-modal" id="shareModal">
         <div class="share-container">
             <div class="share-header">
@@ -107,7 +102,6 @@
                 <button class="close-share-btn" id="closeShareBtn">✕</button>
             </div>
             <div class="share-body">
-                <!-- 렌티큘러 애니메이션 프리뷰 영역 -->
                 <div class="share-preview-wrapper">
                     <div class="share-preview-card" id="sharePreviewCard">
                         <canvas id="shareCanvas"></canvas>
@@ -117,6 +111,8 @@
                 <textarea class="share-msg-input" placeholder="친구에게 전할 메시지를 남겨보세요."></textarea>
             </div>
             <div class="share-actions">
+                <!-- 💡 모바일 기기에서만 나타나는 모션 센서 버튼 추가 -->
+                <button class="share-motion-btn" id="motionBtn" style="display: none;">🧭 모션 센서 켜기</button>
                 <button class="share-copy-btn" id="copyLinkBtn">🔗 링크 복사</button>
                 <button class="share-send-btn" id="sendShareBtn">전송하기</button>
             </div>
@@ -125,7 +121,6 @@
 
     <div class="toast" id="toast">복사되었습니다.</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

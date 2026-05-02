@@ -134,3 +134,28 @@ body { font-family: 'Pretendard', 'Samsung Sharp Sans', -apple-system, sans-seri
 /* Toast */
 .toast { position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 20px); background: #fff; color: #000; padding: 10px 20px; border-radius: 30px; font-size: 0.8rem; font-weight: bold; z-index: 300; opacity: 0; pointer-events: none; transition: all 0.3s ease; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ── Motion Sensor Button ── */
+.share-motion-btn {
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1; /* 모바일에서 버튼들이 꽉 차게 */
+  text-align: center;
+}
+.share-motion-btn:hover {
+  background: var(--accent);
+  color: #000;
+}
+.share-motion-btn.active {
+  background: var(--dim);
+  border-color: var(--dim);
+  color: #ccc;
+  cursor: default;
+}
