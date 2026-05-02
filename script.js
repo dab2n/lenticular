@@ -3,7 +3,7 @@ const MAX_X  = 22;
 const MAX_Y  = 14;
 const LERP   = 0.07;
 
-/* ── Drawing Editor Logic (기존과 동일) ── */
+/* ── Drawing Editor Logic ── */
 const drawingModal = document.getElementById('drawingModal');
 const drawingBoard = document.getElementById('drawingBoard');
 const drawCanvas = document.getElementById('drawCanvas');
@@ -20,7 +20,17 @@ let currentDrawW = 300, currentDrawH = 400;
 
 function openDrawingEditor(imgObj, isLandscape, callback) {
   onSaveCallback = callback;
-  currentDrawW = isLandscape ? 400 : 300; currentDrawH = isLandscape ? 300 : 400;
+  
+  // 모바일 해상도 고려하여 드로잉 보드 사이즈 세팅
+  const isMobile = window.innerWidth <= 768;
+  if(isMobile) {
+      currentDrawW = isLandscape ? 280 : 280; 
+      currentDrawH = isLandscape ? 210 : 373;
+  } else {
+      currentDrawW = isLandscape ? 400 : 300; 
+      currentDrawH = isLandscape ? 300 : 400;
+  }
+
   drawCanvas.width = currentDrawW; drawCanvas.height = currentDrawH;
   if (isLandscape) drawingBoard.classList.add('landscape'); else drawingBoard.classList.remove('landscape');
   drawCtx.clearRect(0, 0, currentDrawW, currentDrawH);
@@ -39,9 +49,23 @@ function applyPenStyle() {
   else if (penType.value === 'neon') { drawCtx.globalAlpha = 1.0; drawCtx.shadowBlur = 15; drawCtx.shadowColor = penColor.value; } 
   else { drawCtx.globalAlpha = 1.0; drawCtx.shadowBlur = 0; }
 }
-drawCanvas.addEventListener('mousedown', (e) => { isDrawing = true; applyPenStyle(); drawCtx.beginPath(); drawCtx.moveTo(e.offsetX, e.offsetY); });
-drawCanvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; drawCtx.lineTo(e.offsetX, e.offsetY); drawCtx.stroke(); });
+
+// 터치 이벤트 지원 (모바일 드로잉)
+function getPointerPos(e) {
+    const rect = drawCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+drawCanvas.addEventListener('mousedown', (e) => { isDrawing = true; applyPenStyle(); drawCtx.beginPath(); const pos = getPointerPos(e); drawCtx.moveTo(pos.x, pos.y); });
+drawCanvas.addEventListener('mousemove', (e) => { if (!isDrawing) return; const pos = getPointerPos(e); drawCtx.lineTo(pos.x, pos.y); drawCtx.stroke(); });
 window.addEventListener('mouseup', () => { isDrawing = false; });
+
+drawCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); isDrawing = true; applyPenStyle(); drawCtx.beginPath(); const pos = getPointerPos(e); drawCtx.moveTo(pos.x, pos.y); }, {passive: false});
+drawCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const pos = getPointerPos(e); drawCtx.lineTo(pos.x, pos.y); drawCtx.stroke(); }, {passive: false});
+window.addEventListener('touchend', () => { isDrawing = false; });
+
 clearBtn.addEventListener('click', () => { if (currentBgImage) drawCtx.putImageData(currentBgImage, 0, 0); });
 cancelBtn.addEventListener('click', closeDrawingEditor);
 saveBtn.addEventListener('click', () => {
@@ -51,7 +75,7 @@ saveBtn.addEventListener('click', () => {
   closeDrawingEditor();
 });
 
-/* ── Lenticular Class (기존과 동일) ── */
+/* ── Lenticular Class ── */
 class LenticularCard {
   constructor(workspaceNode, onImageUpdate) {
     this.workspace = workspaceNode; this.onImageUpdate = onImageUpdate; 
@@ -73,7 +97,15 @@ class LenticularCard {
     this.initEvents(); this.tick = this.tick.bind(this); requestAnimationFrame(this.tick);
   }
   updateCanvasSize() {
-    this.width = this.isLandscape ? 400 : 300; this.height = this.isLandscape ? 300 : 400;
+    const isMobile = window.innerWidth <= 768;
+    if(isMobile) {
+        this.width = this.isLandscape ? 340 : 280; 
+        this.height = this.isLandscape ? 255 : 373;
+    } else {
+        this.width = this.isLandscape ? 400 : 300; 
+        this.height = this.isLandscape ? 300 : 400;
+    }
+    
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     this.canvas.width  = this.width * dpr; this.canvas.height = this.height * dpr;
     this.ctx.scale(dpr, dpr);
@@ -121,6 +153,7 @@ class LenticularCard {
     this.editBtn2.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (this.img2) openDrawingEditor(this.img2, this.isLandscape, (url) => this.loadFromUrl(url, 2)); });
     this.ratioBtns.forEach(btn => btn.addEventListener('click', () => this.setRatio(btn.dataset.ratio)));
     this.shareBtn.addEventListener('click', () => { openShareModal(this.img1, this.img2, this.isLandscape); });
+    window.addEventListener('resize', () => this.updateCanvasSize()); // 화면 회전/리사이징 대응
   }
   onImageReady() { if (this.img1 || this.img2) { this.idle.classList.add('gone'); this.hint.classList.add('show'); } }
   loadFile(file, num) { if (!file || !file.type.startsWith('image/')) return; this.loadFromUrl(URL.createObjectURL(file), num); }
@@ -162,12 +195,9 @@ let shareW = 180, shareH = 240;
 let isSharePlaying = false;
 let shareAnimationId = null;
 
-// 모션 센서 상태 관리
 let isMotionEnabled = false;
-let targetMotionX = 0;
-let targetMotionY = 0;
-let currentMotionX = 0;
-let currentMotionY = 0;
+let targetMotionX = 0; let targetMotionY = 0;
+let currentMotionX = 0; let currentMotionY = 0;
 
 function openShareModal(img1, img2, isLandscape) {
   shareImg1 = img1; shareImg2 = img2;
@@ -180,7 +210,6 @@ function openShareModal(img1, img2, isLandscape) {
   if (isLandscape) sharePreviewCard.classList.add('landscape'); else sharePreviewCard.classList.remove('landscape');
   shareModal.classList.add('show');
   
-  // 모바일 접속 시에만 센서 버튼 활성화
   if (typeof window.orientation !== 'undefined' || navigator.userAgent.includes('Mobile')) {
     motionBtn.style.display = 'block';
   } else {
@@ -212,17 +241,12 @@ function renderShareCanvas(progress) {
   shareCtx.globalAlpha = 1.0;
 }
 
-// 모션 권한 요청 및 이벤트 등록
 motionBtn.addEventListener('click', () => {
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    // iOS 13+ 권한 요청
     DeviceOrientationEvent.requestPermission().then(permissionState => {
-      if (permissionState === 'granted') {
-        enableMotionSensor();
-      }
+      if (permissionState === 'granted') enableMotionSensor();
     }).catch(console.error);
   } else {
-    // Android 또는 권한 불필요 기기
     enableMotionSensor();
   }
 });
@@ -235,40 +259,30 @@ function enableMotionSensor() {
 }
 
 function handleOrientation(e) {
-  // 모바일 기기를 세로로 들었을 때를 기준으로 값 제한 및 매핑
-  const gamma = Math.min(Math.max(e.gamma, -45), 45); // 좌우 기울임 제한
-  const beta = Math.min(Math.max(e.beta - 45, -45), 45); // 상하 기울임 (기본 들고 있는 각도 보정)
-  
-  targetMotionX = (gamma / 45) * 22; // MAX_X 비율에 맞춤
-  targetMotionY = (beta / 45) * -14; // MAX_Y 비율에 맞춤
+  const gamma = Math.min(Math.max(e.gamma, -45), 45); 
+  const beta = Math.min(Math.max(e.beta - 45, -45), 45); 
+  targetMotionX = (gamma / 45) * 22; 
+  targetMotionY = (beta / 45) * -14; 
 }
 
 function playShareAnimation() {
   if (!isSharePlaying) return;
-
   let tiltX, tiltY, progressVal;
 
   if (isMotionEnabled) {
-    // 센서 기반 수동 기울임 (Lerp 적용하여 부드럽게)
     currentMotionX += (targetMotionX - currentMotionX) * 0.1;
     currentMotionY += (targetMotionY - currentMotionY) * 0.1;
-    
-    tiltX = currentMotionX;
-    tiltY = currentMotionY;
-    progressVal = (currentMotionX + 22) / 44; // -22~22 범위를 0~1로 매핑
+    tiltX = currentMotionX; tiltY = currentMotionY;
+    progressVal = (currentMotionX + 22) / 44; 
   } else {
-    // 센서가 꺼져있을 때는 기존의 자동 진자 운동 (Auto-sway)
     const time = Date.now() / 800;
     const sineVal = Math.sin(time);
-    tiltX = sineVal * 18; 
-    tiltY = Math.cos(time * 0.5) * 5; 
+    tiltX = sineVal * 18; tiltY = Math.cos(time * 0.5) * 5; 
     progressVal = (sineVal + 1) / 2;
   }
 
   sharePreviewCard.style.transform = `rotateX(${tiltY}deg) rotateY(${tiltX}deg)`;
-
-  const gx = 50 + (tiltX / 18) * 30;
-  const gy = 50 - (tiltY / 5) * 30;
+  const gx = 50 + (tiltX / 18) * 30; const gy = 50 - (tiltY / 5) * 30;
   shareGloss.style.background = `radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,0.2) 0%, transparent 65%)`;
 
   renderShareCanvas(progressVal);
@@ -284,13 +298,23 @@ closeShareBtn.addEventListener('click', closeShareModal);
 copyLinkBtn.addEventListener('click', () => { showToast('🔗 링크가 클립보드에 복사되었습니다!'); closeShareModal(); });
 sendShareBtn.addEventListener('click', () => { showToast('💌 친구에게 메시지를 전송했습니다!'); closeShareModal(); });
 
-/* ── App State & Initialization ── */
+
+/* ── App State, History & Menu Toggle ── */
 const historyList = document.getElementById('historyList');
 const activeWorkspace = document.getElementById('activeWorkspace');
 const template = document.getElementById('cardSetTemplate');
 const addSetBtn = document.getElementById('addSetBtn');
+const menuToggleBtn = document.getElementById('menuToggleBtn');
+const historyPanel = document.getElementById('historyPanel');
 
 let cardSets = []; let setIdCounter = 0;
+
+// 💡 햄버거 메뉴 토글 이벤트
+if(menuToggleBtn) {
+    menuToggleBtn.addEventListener('click', () => {
+        historyPanel.classList.toggle('open');
+    });
+}
 
 function createNewCardSet() {
   const id = ++setIdCounter;
@@ -316,6 +340,7 @@ function createNewCardSet() {
   cardSets.push({ id, workspaceNode, thumbNode, instance });
   switchActiveSet(id);
 }
+
 function deleteCardSet(targetId) {
   const index = cardSets.findIndex(set => set.id === targetId);
   if (index === -1) return;
@@ -325,11 +350,15 @@ function deleteCardSet(targetId) {
   cardSets.splice(index, 1);
   if (wasActive) { if (cardSets.length > 0) switchActiveSet(cardSets[cardSets.length - 1].id); else createNewCardSet(); }
 }
+
 function switchActiveSet(targetId) {
   cardSets.forEach(set => {
     if (set.id === targetId) { set.workspaceNode.classList.add('active'); set.thumbNode.classList.add('active'); }
     else { set.workspaceNode.classList.remove('active'); set.thumbNode.classList.remove('active'); }
   });
+  // 💡 모바일에서 카드를 선택하면 히스토리 패널이 자동으로 닫히도록 설정
+  historyPanel.classList.remove('open');
 }
+
 createNewCardSet();
 addSetBtn.addEventListener('click', createNewCardSet);

@@ -9,13 +9,15 @@
 <body>
     <div class="app">
         <header class="header">
+            <!-- 💡 모바일용 메뉴 토글 버튼 추가 -->
+            <button id="menuToggleBtn" class="menu-toggle-btn">☰</button>
             <div class="logo">LENTICULAR</div>
             <h1>Card Generator</h1>
             <button id="addSetBtn" class="add-btn">+ 새 카드 추가</button>
         </header>
 
         <div class="editor-layout">
-            <aside class="history-panel">
+            <aside class="history-panel" id="historyPanel">
                 <div class="history-label">HISTORY</div>
                 <div class="history-list" id="historyList"></div>
             </aside>
@@ -64,7 +66,7 @@
                     </div>
                 </div>
                 <div class="stage-footer">
-                    <div class="stage-hint">← 마우스를 올려 좌우로 기울여보세요 →</div>
+                    <div class="stage-hint">← 기기를 기울여보세요 →</div>
                     <button class="share-trigger-btn">🔗 공유하기</button>
                 </div>
             </div>
@@ -111,7 +113,6 @@
                 <textarea class="share-msg-input" placeholder="친구에게 전할 메시지를 남겨보세요."></textarea>
             </div>
             <div class="share-actions">
-                <!-- 💡 모바일 기기에서만 나타나는 모션 센서 버튼 추가 -->
                 <button class="share-motion-btn" id="motionBtn" style="display: none;">🧭 모션 센서 켜기</button>
                 <button class="share-copy-btn" id="copyLinkBtn">🔗 링크 복사</button>
                 <button class="share-send-btn" id="sendShareBtn">전송하기</button>
