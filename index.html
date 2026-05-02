@@ -9,7 +9,6 @@
 <body>
     <div class="app">
         <header class="header">
-            <!-- 💡 모바일용 메뉴 토글 버튼 추가 -->
             <button id="menuToggleBtn" class="menu-toggle-btn">☰</button>
             <div class="logo">LENTICULAR</div>
             <h1>Card Generator</h1>
@@ -65,8 +64,10 @@
                         </div>
                     </div>
                 </div>
+                <!-- 💡 메인 스테이지 하단으로 센서 버튼 이동 -->
                 <div class="stage-footer">
                     <div class="stage-hint">← 기기를 기울여보세요 →</div>
+                    <button class="workspace-motion-btn" style="display: none;">🧭 센서 켜기</button>
                     <button class="share-trigger-btn">🔗 공유하기</button>
                 </div>
             </div>
@@ -97,6 +98,7 @@
         </div>
     </div>
 
+    <!-- 💡 공유 모달: 모션 버튼 완전히 삭제됨 -->
     <div class="share-modal" id="shareModal">
         <div class="share-container">
             <div class="share-header">
@@ -113,7 +115,6 @@
                 <textarea class="share-msg-input" placeholder="친구에게 전할 메시지를 남겨보세요."></textarea>
             </div>
             <div class="share-actions">
-                <button class="share-motion-btn" id="motionBtn" style="display: none;">🧭 모션 센서 켜기</button>
                 <button class="share-copy-btn" id="copyLinkBtn">🔗 링크 복사</button>
                 <button class="share-send-btn" id="sendShareBtn">전송하기</button>
             </div>
@@ -121,7 +122,6 @@
     </div>
 
     <div class="toast" id="toast">복사되었습니다.</div>
-
     <script src="script.js"></script>
 </body>
 </html>
